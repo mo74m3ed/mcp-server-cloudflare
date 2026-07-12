@@ -20,17 +20,17 @@
 	},
 	"dependencies": {
 		"@cloudflare/workers-oauth-provider": "0.4.0",
-		"@hono/node-server": "1.13.8",
+		"@hono/node-server": "1.19.13",
 		"@hono/zod-validator": "0.4.3",
-		"@modelcontextprotocol/sdk": "1.20.2",
+		"@modelcontextprotocol/sdk": "1.29.0",
 		"@n8n/json-schema-to-zod": "1.1.0",
 		"@repo/eval-tools": "workspace:*",
 		"@repo/mcp-common": "workspace:*",
 		"@repo/mcp-observability": "workspace:*",
-		"agents": "0.2.19",
+		"agents": "0.17.3",
 		"cron-schedule": "5.0.4",
 		"esbuild": "0.25.1",
-		"hono": "4.7.6",
+		"hono": "4.12.25",
 		"mime": "4.0.6",
 		"simple-git-hooks": "2.12.1",
 		"tsx": "4.19.3",
@@ -45,6 +45,6 @@
 		"concurrently": "9.1.2",
 		"mock-fs": "5.5.0",
 		"start-server-and-test": "2.0.11",
-		"wrangler": "4.10.0"
+		"wrangler": "4.110.0"
 	}
 }
