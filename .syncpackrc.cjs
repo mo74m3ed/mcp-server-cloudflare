@@ -5,6 +5,17 @@ const config = {
 	lintFormatting: false, // handled by prettier
 	versionGroups: [
 		{
+			label: 'use the workspace catalog for the MCP migration stack',
+			dependencies: [
+				'@cloudflare/workers-oauth-provider',
+				'@modelcontextprotocol/client',
+				'@modelcontextprotocol/sdk',
+				'@modelcontextprotocol/server',
+				'agents',
+			],
+			pinVersion: 'catalog:',
+		},
+		{
 			label: 'local packages',
 			packages: ['**'],
 			dependencies: ['@repo/*'],
@@ -24,7 +35,7 @@ const config = {
 		{
 			label: 'pin vitest compatible with @cloudflare/vitest-pool-workers',
 			dependencies: ['vitest', '@vitest/ui'],
-			pinVersion: '3.0.9',
+			pinVersion: '4.1.8',
 		},
 		{
 			label: 'pin typescript for eslint',
@@ -48,11 +59,22 @@ const config = {
 		{
 			label: 'use zod v4 in packages/tools',
 			dependencies: ['zod'],
-			pinVersion: '4.0.0-beta.20250505T195954',
+			pinVersion: '4.4.3',
 			packages: ['@repo/tools'],
 		},
 	],
 	semverGroups: [
+		{
+			label: 'workspace catalogs resolve exact versions in pnpm-workspace.yaml',
+			dependencies: [
+				'@cloudflare/workers-oauth-provider',
+				'@modelcontextprotocol/client',
+				'@modelcontextprotocol/sdk',
+				'@modelcontextprotocol/server',
+				'agents',
+			],
+			isIgnored: true,
+		},
 		{
 			label: 'pin all deps',
 			range: '',

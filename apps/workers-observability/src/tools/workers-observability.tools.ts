@@ -1,35 +1,38 @@
 import { writeToString } from '@fast-csv/format'
 import { WorkersLogger } from 'workers-tagged-logger'
+import { z } from 'zod'
+
+import { requireRequestProps } from '@repo/mcp-common/src/request-context'
 
 import {
 	handleWorkerLogsKeys,
 	handleWorkerLogsValues,
 	queryWorkersObservability,
-} from '@repo/mcp-common/src/api/workers-observability.api'
-import { getProps } from '@repo/mcp-common/src/get-props'
-import {
-	zKeysRequest,
-	zQueryRunRequest,
-	zValuesRequest,
-} from '@repo/mcp-common/src/types/workers-logs.types'
+} from '../api/workers-observability.api'
+import { zKeysRequest, zQueryRunRequest, zValuesRequest } from '../types/workers-logs.types'
 
-import type { ObservabilityMCP } from '../workers-observability.app'
+import type { McpRegistrationContext } from '@repo/mcp-common/src/registration-context'
+import type { Env } from '../workers-observability.context'
 
 type Tags = {
 	toolName?: string
+	requestId?: string
+	traceparent?: string
+	protocolVersion?: string
+	browserUserAgent?: string
+	hasAccount?: boolean
+	datasets?: string[]
+	view?: string
 }
-const logger = new WorkersLogger<Tags>()
-/**
- * Registers the logs analysis tool with the MCP server
- * @param server The MCP server instance
- * @param accountId Cloudflare account ID
- * @param apiToken Cloudflare API token
- */
-export function registerObservabilityTools(agent: ObservabilityMCP) {
+
+/** Registers observability tools with request-local auth and logging context. */
+export function registerObservabilityTools(context: McpRegistrationContext<Env>) {
+	const logger = new WorkersLogger<Tags>()
 	// Register the worker logs analysis tool by worker name
-	agent.server.tool(
+	context.accountTool(
 		'query_worker_observability',
-		`Query the Workers Observability API to analyze logs and metrics from your Cloudflare Workers.
+		{
+			description: `Query the Workers Observability API to analyze logs and metrics from your Cloudflare Workers.
 
 	* A query typical query looks like this:
 				{"view":"events","queryId":"workers-logs-events","limit":5,"dry":true,"parameters":{"datasets":["cloudflare-workers"],"filters":[{"id":"520","key":"message","operation":"eq","type":"string","value":"Clickhouse Statistics"},{"id":"2088","key":"statistics.elapsed","operation":"gt","type":"number","value":"0.269481519"}],"calculations":[],"groupBys":[],"havings":[]},"timeframe":{"to":"2025-04-30T20:53:15Z","from":" ""2025-04-30T19:53:15Z"}}
@@ -50,30 +53,21 @@ This tool provides three primary views of your Worker data:
 - If no results are returned, suggest broadening the time range or relaxing filters
 - For errors about invalid fields, recommend using observability_keys to see available options
 `,
-
-		{
-			query: zQueryRunRequest,
+			inputSchema: z.object({
+				query: zQueryRunRequest,
+			}),
 		},
-		async ({ query }, req) => {
-			logger.setTags({ userAgent: req.requestInfo?.headers?.['mcp-protocol-version'] })
-			logger.setTags({ mcpSessionId: req.requestInfo?.headers?.['mcp-session-id'] })
-			logger.setTags({ userAgent: req.requestInfo?.headers?.['sec-ch-ua'] })
-			logger.setTags({ toolName: 'query_worker_observability' })
-			const accountId = await agent.getActiveAccountId()
+		async ({ query }, accountId) => {
+			logger.setTags({
+				requestId: context.request.headers.get('cf-ray') ?? crypto.randomUUID(),
+				traceparent: context.request.headers.get('traceparent') ?? undefined,
+				protocolVersion: context.mcp.era,
+				browserUserAgent: context.request.headers.get('sec-ch-ua') ?? undefined,
+				toolName: 'query_worker_observability',
+			})
 			logger.setTags({ hasAccount: !!accountId })
-			if (!accountId) {
-				logger.warn('Ran Workers Observability Tool')
-				return {
-					content: [
-						{
-							type: 'text',
-							text: 'No currently active accountId. Try listing your accounts (accounts_list) and then setting an active account (set_active_account)',
-						},
-					],
-				}
-			}
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				logger.setTags({ datasets: query.parameters?.datasets })
 				logger.setTags({ view: query.view })
 				const response = await queryWorkersObservability(props.accessToken, accountId, query)
@@ -190,14 +184,16 @@ This tool provides three primary views of your Worker data:
 							}),
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 
-	agent.server.tool(
+	context.accountTool(
 		'observability_keys',
-		`Find keys in the Workers Observability Data
+		{
+			description: `Find keys in the Workers Observability Data
 
 ## Best Practices
 - Set a high limit (1000+) to ensure you see all available keys
@@ -207,21 +203,11 @@ This tool provides three primary views of your Worker data:
 - If expected fields are missing, verify the Worker is actively logging
 - For empty results, try broadening your time range
 `,
-		{ keysQuery: zKeysRequest },
-		async ({ keysQuery }) => {
-			const accountId = await agent.getActiveAccountId()
-			if (!accountId) {
-				return {
-					content: [
-						{
-							type: 'text',
-							text: 'No currently active accountId. Try listing your accounts (accounts_list) and then setting an active account (set_active_account)',
-						},
-					],
-				}
-			}
+			inputSchema: z.object({ keysQuery: zKeysRequest }),
+		},
+		async ({ keysQuery }, accountId) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				const result = await handleWorkerLogsKeys(props.accessToken, accountId, keysQuery)
 
 				const tsv = await writeToString(
@@ -246,33 +232,25 @@ This tool provides three primary views of your Worker data:
 							}),
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 
-	agent.server.tool(
+	context.accountTool(
 		'observability_values',
-		`Find values in the Workers Observability Data.
+		{
+			description: `Find values in the Workers Observability Data.
 
 ## Troubleshooting
 - For no results, verify the field exists using observability_keys first
 - If expected values are missing, try broadening your time range`,
-		{ valuesQuery: zValuesRequest },
-		async ({ valuesQuery }) => {
-			const accountId = await agent.getActiveAccountId()
-			if (!accountId) {
-				return {
-					content: [
-						{
-							type: 'text',
-							text: 'No currently active accountId. Try listing your accounts (accounts_list) and then setting an active account (set_active_account)',
-						},
-					],
-				}
-			}
+			inputSchema: z.object({ valuesQuery: zValuesRequest }),
+		},
+		async ({ valuesQuery }, accountId) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				const result = await handleWorkerLogsValues(props.accessToken, accountId, valuesQuery)
 				const tsv = await writeToString(
 					result?.map((value) => ({ type: value.type, value: value.value })) || [],
@@ -296,6 +274,7 @@ This tool provides three primary views of your Worker data:
 							}),
 						},
 					],
+					isError: true,
 				}
 			}
 		}

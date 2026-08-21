@@ -12,6 +12,10 @@
 		{
 			"new_sqlite_classes": ["BrowserMCP"],
 			"tag": "v1"
+		},
+		{
+			"deleted_classes": ["BrowserMCP"],
+			"tag": "v2"
 		}
 	],
 	"observability": {
@@ -20,18 +24,6 @@
 			"enabled": true,
 			"head_sampling_rate": 0.1
 		}
-	},
-	"durable_objects": {
-		"bindings": [
-			{
-				"class_name": "BrowserMCP",
-				"name": "MCP_OBJECT"
-			},
-			{
-				"class_name": "UserDetails",
-				"name": "USER_DETAILS"
-			}
-		]
 	},
 	"kv_namespaces": [
 		{
@@ -61,20 +53,12 @@
 		"staging": {
 			"name": "mcp-cloudflare-browser-staging",
 			"account_id": "6702657b6aa048cf3081ff3ff3c9c52f",
-			"routes": [{ "pattern": "browser-staging.mcp.cloudflare.com", "custom_domain": true }],
-			"durable_objects": {
-				"bindings": [
-					{
-						"class_name": "BrowserMCP",
-						"name": "MCP_OBJECT"
-					},
-					{
-						"class_name": "UserDetails",
-						"name": "USER_DETAILS",
-						"script_name": "mcp-cloudflare-workers-observability-staging"
-					}
-				]
-			},
+			"routes": [
+				{
+					"pattern": "browser-staging.mcp.cloudflare.com",
+					"custom_domain": true
+				}
+			],
 			"kv_namespaces": [
 				{
 					"binding": "OAUTH_KV",
@@ -83,7 +67,7 @@
 			],
 			"vars": {
 				"ENVIRONMENT": "staging",
-				"MCP_SERVER_NAME": "Cloudflare Browser Rendering Remote MCP Server - Staging",
+				"MCP_SERVER_NAME": "Cloudflare Browser Run Remote MCP Server - Staging",
 				"MCP_SERVER_VERSION": "1.0.0"
 			},
 			"analytics_engine_datasets": [
@@ -96,20 +80,12 @@
 		"production": {
 			"name": "mcp-cloudflare-browser-production",
 			"account_id": "6702657b6aa048cf3081ff3ff3c9c52f",
-			"routes": [{ "pattern": "browser.mcp.cloudflare.com", "custom_domain": true }],
-			"durable_objects": {
-				"bindings": [
-					{
-						"class_name": "BrowserMCP",
-						"name": "MCP_OBJECT"
-					},
-					{
-						"class_name": "UserDetails",
-						"name": "USER_DETAILS",
-						"script_name": "mcp-cloudflare-workers-observability-production"
-					}
-				]
-			},
+			"routes": [
+				{
+					"pattern": "browser.mcp.cloudflare.com",
+					"custom_domain": true
+				}
+			],
 			"kv_namespaces": [
 				{
 					"binding": "OAUTH_KV",
@@ -118,7 +94,7 @@
 			],
 			"vars": {
 				"ENVIRONMENT": "production",
-				"MCP_SERVER_NAME": "Cloudflare Browser Rendering Remote MCP Server",
+				"MCP_SERVER_NAME": "Cloudflare Browser Run Remote MCP Server",
 				"MCP_SERVER_VERSION": "1.0.0"
 			},
 			"analytics_engine_datasets": [

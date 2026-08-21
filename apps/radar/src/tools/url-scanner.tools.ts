@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { getProps } from '@repo/mcp-common/src/get-props'
+import { requireRequestProps } from '@repo/mcp-common/src/request-context'
 
 import {
 	CreateScanResult,
@@ -12,52 +12,27 @@ import {
 	UrlParam,
 } from '../types/url-scanner'
 
-import type { RadarMCP } from '../radar.app'
+import type { McpRegistrationContext } from '@repo/mcp-common/src/registration-context'
+import type { Env } from '../radar.context'
 
 const URLSCANNER_API_BASE = 'https://api.cloudflare.com/client/v4/accounts'
 
-type ToolResponse = {
-	content: Array<{ type: 'text'; text: string }>
-}
-
-/**
- * Helper to get account ID or return error response
- */
-async function getAccountIdOrError(
-	agent: RadarMCP
-): Promise<{ accountId: string } | { error: ToolResponse }> {
-	const accountId = await agent.getActiveAccountId()
-	if (!accountId) {
-		return {
-			error: {
-				content: [
-					{
-						type: 'text' as const,
-						text: 'No currently active accountId. Try listing your accounts (accounts_list) and then setting an active account (set_active_account)',
-					},
-				],
-			},
-		}
-	}
-	return { accountId }
-}
-
-export function registerUrlScannerTools(agent: RadarMCP) {
+export function registerUrlScannerTools(context: McpRegistrationContext<Env>) {
 	// Search URL scans
-	agent.server.tool(
+	context.accountTool(
 		'search_url_scans',
-		"Search URL scans using ElasticSearch-like query syntax. Examples: 'page.domain:example.com', 'verdicts.malicious:true', 'page.asn:AS24940 AND hash:xxx', 'apikey:me AND date:[2025-01 TO 2025-02]'",
 		{
-			query: SearchQueryParam,
-			size: SearchSizeParam,
+			description:
+				"Search URL scans using ElasticSearch-like query syntax. Examples: 'page.domain:example.com', 'verdicts.malicious:true', 'page.asn:AS24940 AND hash:xxx', 'apikey:me AND date:[2025-01 TO 2025-02]'",
+			inputSchema: z.object({
+				query: SearchQueryParam,
+				size: SearchSizeParam,
+			}),
 		},
-		async ({ query, size }) => {
-			const result = await getAccountIdOrError(agent)
-			if ('error' in result) return result.error
-
+		async ({ query, size }, accountId) => {
 			try {
-				const props = getProps(agent)
-				const url = new URL(`${URLSCANNER_API_BASE}/${result.accountId}/urlscanner/v2/search`)
+				const props = requireRequestProps(context)
+				const url = new URL(`${URLSCANNER_API_BASE}/${accountId}/urlscanner/v2/search`)
 				if (query) url.searchParams.set('q', query)
 				if (size) url.searchParams.set('size', String(size))
 
@@ -87,32 +62,33 @@ export function registerUrlScannerTools(agent: RadarMCP) {
 							text: `Error searching scans: ${error instanceof Error ? error.message : String(error)}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 
 	// Create URL scan
-	agent.server.tool(
+	context.accountTool(
 		'create_url_scan',
-		'Submit a URL to scan. Returns the scan UUID which can be used to retrieve results.',
 		{
-			url: UrlParam,
-			visibility: ScanVisibilityParam,
-			screenshotResolution: ScreenshotResolutionParam,
+			description:
+				'Submit a URL to scan. Returns the scan UUID which can be used to retrieve results.',
+			inputSchema: z.object({
+				url: UrlParam,
+				visibility: ScanVisibilityParam,
+				screenshotResolution: ScreenshotResolutionParam,
+			}),
 		},
-		async ({ url, visibility, screenshotResolution }) => {
-			const result = await getAccountIdOrError(agent)
-			if ('error' in result) return result.error
-
+		async ({ url, visibility, screenshotResolution }, accountId) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 
 				const body: Record<string, unknown> = { url }
 				if (visibility) body.visibility = visibility
 				if (screenshotResolution) body.screenshotsResolutions = [screenshotResolution]
 
-				const res = await fetch(`${URLSCANNER_API_BASE}/${result.accountId}/urlscanner/v2/scan`, {
+				const res = await fetch(`${URLSCANNER_API_BASE}/${accountId}/urlscanner/v2/scan`, {
 					method: 'POST',
 					headers: {
 						Authorization: `Bearer ${props.accessToken}`,
@@ -148,27 +124,28 @@ export function registerUrlScannerTools(agent: RadarMCP) {
 							text: `Error creating scan: ${error instanceof Error ? error.message : String(error)}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 
 	// Get URL scan result
-	agent.server.tool(
+	context.accountTool(
 		'get_url_scan',
-		'Get the results of a URL scan by its UUID. Returns detailed information including verdicts, page info, requests, cookies, and more.',
 		{
-			scanId: ScanIdParam,
+			description:
+				'Get the results of a URL scan by its UUID. Returns detailed information including verdicts, page info, requests, cookies, and more.',
+			inputSchema: z.object({
+				scanId: ScanIdParam,
+			}),
 		},
-		async ({ scanId }) => {
-			const result = await getAccountIdOrError(agent)
-			if ('error' in result) return result.error
-
+		async ({ scanId }, accountId) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 
 				const res = await fetch(
-					`${URLSCANNER_API_BASE}/${result.accountId}/urlscanner/v2/result/${scanId}`,
+					`${URLSCANNER_API_BASE}/${accountId}/urlscanner/v2/result/${scanId}`,
 					{
 						headers: { Authorization: `Bearer ${props.accessToken}` },
 					}
@@ -210,32 +187,32 @@ export function registerUrlScannerTools(agent: RadarMCP) {
 							text: `Error getting scan: ${error instanceof Error ? error.message : String(error)}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 
 	// Get scan screenshot
-	agent.server.tool(
+	context.accountTool(
 		'get_url_scan_screenshot',
-		'Get the screenshot URL for a completed scan.',
 		{
-			scanId: ScanIdParam,
-			resolution: z
-				.enum(['desktop', 'mobile', 'tablet'])
-				.default('desktop')
-				.optional()
-				.describe('Screenshot resolution/device type.'),
+			description: 'Get the screenshot URL for a completed scan.',
+			inputSchema: z.object({
+				scanId: ScanIdParam,
+				resolution: z
+					.enum(['desktop', 'mobile', 'tablet'])
+					.default('desktop')
+					.optional()
+					.describe('Screenshot resolution/device type.'),
+			}),
 		},
-		async ({ scanId, resolution }) => {
-			const result = await getAccountIdOrError(agent)
-			if ('error' in result) return result.error
-
+		async ({ scanId, resolution }, accountId) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				const res = resolution || 'desktop'
 
-				const screenshotUrl = `${URLSCANNER_API_BASE}/${result.accountId}/urlscanner/v2/screenshots/${scanId}.png`
+				const screenshotUrl = `${URLSCANNER_API_BASE}/${accountId}/urlscanner/v2/screenshots/${scanId}.png`
 				// Verify the screenshot exists
 				const response = await fetch(screenshotUrl, {
 					method: 'HEAD',
@@ -266,31 +243,29 @@ export function registerUrlScannerTools(agent: RadarMCP) {
 							text: `Error getting screenshot: ${error instanceof Error ? error.message : String(error)}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 
 	// Get scan HAR
-	agent.server.tool(
+	context.accountTool(
 		'get_url_scan_har',
-		'Get the HAR (HTTP Archive) data for a completed scan. Contains detailed network request/response information.',
 		{
-			scanId: ScanIdParam,
+			description:
+				'Get the HAR (HTTP Archive) data for a completed scan. Contains detailed network request/response information.',
+			inputSchema: z.object({
+				scanId: ScanIdParam,
+			}),
 		},
-		async ({ scanId }) => {
-			const result = await getAccountIdOrError(agent)
-			if ('error' in result) return result.error
-
+		async ({ scanId }, accountId) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 
-				const res = await fetch(
-					`${URLSCANNER_API_BASE}/${result.accountId}/urlscanner/v2/har/${scanId}`,
-					{
-						headers: { Authorization: `Bearer ${props.accessToken}` },
-					}
-				)
+				const res = await fetch(`${URLSCANNER_API_BASE}/${accountId}/urlscanner/v2/har/${scanId}`, {
+					headers: { Authorization: `Bearer ${props.accessToken}` },
+				})
 
 				if (!res.ok) {
 					if (res.status === 404) {
@@ -317,6 +292,7 @@ export function registerUrlScannerTools(agent: RadarMCP) {
 							text: `Error getting HAR: ${error instanceof Error ? error.message : String(error)}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}

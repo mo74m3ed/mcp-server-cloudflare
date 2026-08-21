@@ -1,5 +1,88 @@
 # cloudflare-browser-mcp-server
 
+## 0.3.4
+
+### Patch Changes
+
+- b9e6d76: Return an actionable `410 Gone` Problem Details response when a client attempts the removed HTTP+SSE transport with `GET /sse`. The response explains that clients can configure the existing `/sse` URL to use Streamable HTTP or, preferably, move to `/mcp` for future compatibility. It preserves query parameters, identifies the recommended replacement in a `Link` header, and is available before OAuth authentication. Streamable HTTP `POST` requests continue to work on both `/sse` and `/mcp`.
+- Updated dependencies [b9e6d76]
+  - @repo/mcp-common@0.20.10
+
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies [12a9a61]
+  - @repo/mcp-common@0.20.9
+
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [4e1e6ab]
+  - @repo/mcp-common@0.20.8
+
+## 0.3.1
+
+### Patch Changes
+
+- 1df6213: Migrate all MCP servers to fresh SDK v2 factories with default stateless 2025 compatibility, request-scoped auth/context, and no live protocol Durable Object or SSE session state. Upgrade the released MCP stack to `agents@0.20.1`, `@modelcontextprotocol/server@2.0.0`, `@modelcontextprotocol/client@2.0.0`, and SDK v1 compatibility package `@modelcontextprotocol/sdk@1.30.0`, using the isolated `agents/mcp/server` stateless handler. Keep `/sse` as a URL alias for the same Streamable HTTP handler as `/mcp`, without retaining the deprecated HTTP+SSE transport. Assemble every deployment through canonical public/authenticated app modules, prune obsolete app-level routing dependencies, and expose a tracked registration context instead of the raw SDK server. Preserve append-only Durable Object migration history while explicitly deleting retired protocol classes, preserve application/security state, upgrade the OAuth provider to 0.8.2 with exact resource matching, bound MCP request bodies, and require explicit Workers Builds identifiers.
+- Updated dependencies [1df6213]
+  - @repo/mcp-common@0.20.7
+
+## 0.3.0
+
+### Minor Changes
+
+- d9cc342: Add MCP tools for the remaining Browser Rendering REST quick actions, bringing the Browser Run MCP server to parity with the REST API: `get_url_pdf`, `get_url_snapshot`, `scrape_url_elements`, `get_url_json`, `get_url_links`, `start_crawl`, `get_crawl_result`, `cancel_crawl`, `list_browser_sessions`, and `kill_browser_session`.
+
+### Patch Changes
+
+- 52c633e: Fix `start_crawl` tool `depth` parameter validation: the REST `/crawl` endpoint requires `depth >= 1`, but the MCP tool schema allowed `depth: 0`, producing a confusing downstream 400 instead of a clear local validation error. Schema now uses `.min(1)`.
+- Updated dependencies [cb01861]
+  - @repo/mcp-common@0.20.6
+
+## 0.2.0
+
+### Minor Changes
+
+- f625075: Centralize Cloudflare account resolution and remove the account-management tools.
+
+  The `accounts_list` and `set_active_account` tools are removed. Account scoping is now
+  resolved automatically by an `AccountManager` (via the new `server.accountTool()`
+  registration), in priority order:
+
+  1. **Auth-pinned account** — an account-scoped API token's account, or an OAuth token with a
+     single account, is used automatically (no `account_id` parameter is exposed).
+  2. **`cf-account-id` request header** — for tokens that can access multiple accounts, set this
+     header in your MCP client config to pick an account.
+  3. **`account_id` tool argument** — for multi-account tokens, account-scoped tools expose an
+     optional `account_id` parameter; when omitted (and no header is set) the tool returns an
+     error listing the accounts you can use. Multi-account credentials also list their accounts
+     in the server's `initialize` instructions.
+
+  All tool error responses now set `isError: true` so clients can distinguish failures.
+
+### Patch Changes
+
+- a358e69: Upgrade `@cloudflare/workers-oauth-provider` 0.4.0 → 0.7.0.
+
+  No tool or behavior changes. The only API change affecting this repo is that
+  `TokenExchangeCallbackOptions` now carries a required `grantId` field, which only
+  touched a test fixture (the provider supplies it at runtime).
+
+- f625075: Upgrade core dependencies: `agents` 0.2.19 → 0.13.3, `@modelcontextprotocol/sdk` 1.20.2 →
+  1.29.0, `zod` 3 → 4, and `ai` 4 → 6.
+
+  No user-facing tool or behavior changes. Internal adjustments for the new versions:
+
+  - `zod` 4: `z.record(...)` now takes an explicit key schema; `z.string().ip()` replaced with
+    `z.ipv4()`/`z.ipv6()` validation; dropped the removed `objectOutputType` helper.
+  - `agents` 0.13: `McpAgent` env generic is constrained to `Cloudflare.Env`.
+  - MCP SDK 1.29: tool `annotations` hints must be flat (`{ title, readOnlyHint, ... }`) — fixes a
+    latent bug where nested hints were silently ignored.
+  - `ai` 6: eval tooling updated (`LanguageModel`, `inputSchema`, `stopWhen`/`stepCountIs`, tool-call `input`).
+
 ## 0.1.12
 
 ### Patch Changes

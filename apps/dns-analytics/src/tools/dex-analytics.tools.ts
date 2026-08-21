@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
 import { getCloudflareClient } from '@repo/mcp-common/src/cloudflare-api'
-import { getProps } from '@repo/mcp-common/src/get-props'
+import { requireRequestProps } from '@repo/mcp-common/src/request-context'
 
 import type { AccountGetParams } from 'cloudflare/resources/accounts/accounts.mjs'
 import type { ReportGetParams } from 'cloudflare/resources/dns/analytics.mjs'
 import type { ZoneGetParams } from 'cloudflare/resources/dns/settings.mjs'
-import type { DNSAnalyticsMCP } from '../dns-analytics.app'
+import type { McpRegistrationContext } from '@repo/mcp-common/src/registration-context'
 
 function getStartDate(days: number) {
 	const today = new Date()
@@ -14,18 +14,20 @@ function getStartDate(days: number) {
 	return start_date.toISOString()
 }
 
-export function registerAnalyticTools(agent: DNSAnalyticsMCP) {
+export function registerAnalyticTools<Env>(context: McpRegistrationContext<Env>) {
 	// Register DNS Report tool
-	agent.server.tool(
+	context.registerTool(
 		'dns_report',
-		'Fetch the DNS Report for a given zone since a date',
 		{
-			zone: z.string(),
-			days: z.number(),
+			description: 'Fetch the DNS Report for a given zone since a date',
+			inputSchema: z.object({
+				zone: z.string(),
+				days: z.number(),
+			}),
 		},
 		async ({ zone, days }) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				const client = getCloudflareClient(props.accessToken)
 				const start_date = getStartDate(days)
 				const params: ReportGetParams = {
@@ -53,28 +55,21 @@ export function registerAnalyticTools(agent: DNSAnalyticsMCP) {
 							text: `Error fetching DNS report: ${error instanceof Error && error.message}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 	// Register Account DNS Settings display tool
-	agent.server.tool(
+	context.accountTool(
 		'show_account_dns_settings',
-		'Show DNS settings for current account',
-		async () => {
+		{
+			description: 'Show DNS settings for current account',
+			inputSchema: z.object({}),
+		},
+		async (_args, accountId) => {
 			try {
-				const accountId = await agent.getActiveAccountId()
-				if (!accountId) {
-					return {
-						content: [
-							{
-								type: 'text',
-								text: 'No currently active accountId. Try listing your accounts (accounts_list) and then setting an active account (set_active_account)',
-							},
-						],
-					}
-				}
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				const client = getCloudflareClient(props.accessToken)
 				const params: AccountGetParams = {
 					account_id: accountId,
@@ -98,20 +93,23 @@ export function registerAnalyticTools(agent: DNSAnalyticsMCP) {
 							text: `Error fetching DNS report: ${error instanceof Error && error.message}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}
 	)
 	// Register Zone DNS Settings display tool
-	agent.server.tool(
+	context.registerTool(
 		'show_zone_dns_settings',
-		'Show DNS settings for a zone',
 		{
-			zone: z.string(),
+			description: 'Show DNS settings for a zone',
+			inputSchema: z.object({
+				zone: z.string(),
+			}),
 		},
 		async ({ zone }) => {
 			try {
-				const props = getProps(agent)
+				const props = requireRequestProps(context)
 				const client = getCloudflareClient(props.accessToken)
 				const params: ZoneGetParams = {
 					zone_id: zone,
@@ -135,6 +133,7 @@ export function registerAnalyticTools(agent: DNSAnalyticsMCP) {
 							text: `Error fetching DNS report: ${error instanceof Error && error.message}`,
 						},
 					],
+					isError: true,
 				}
 			}
 		}

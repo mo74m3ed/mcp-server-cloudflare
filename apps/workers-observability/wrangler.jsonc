@@ -12,6 +12,14 @@
 		{
 			"new_sqlite_classes": ["UserDetails", "ObservabilityMCP"],
 			"tag": "v1"
+		},
+		{
+			"deleted_classes": ["UserDetails"],
+			"tag": "v2"
+		},
+		{
+			"deleted_classes": ["ObservabilityMCP"],
+			"tag": "v3"
 		}
 	],
 	"observability": {
@@ -20,18 +28,6 @@
 			"enabled": true,
 			"head_sampling_rate": 0.1
 		}
-	},
-	"durable_objects": {
-		"bindings": [
-			{
-				"class_name": "ObservabilityMCP",
-				"name": "MCP_OBJECT"
-			},
-			{
-				"class_name": "UserDetails",
-				"name": "USER_DETAILS"
-			}
-		]
 	},
 	"kv_namespaces": [
 		{
@@ -71,18 +67,6 @@
 			"name": "mcp-cloudflare-workers-observability-staging",
 			"account_id": "6702657b6aa048cf3081ff3ff3c9c52f",
 			"routes": [{ "pattern": "observability-staging.mcp.cloudflare.com", "custom_domain": true }],
-			"durable_objects": {
-				"bindings": [
-					{
-						"class_name": "ObservabilityMCP",
-						"name": "MCP_OBJECT"
-					},
-					{
-						"class_name": "UserDetails",
-						"name": "USER_DETAILS"
-					}
-				]
-			},
 			"kv_namespaces": [
 				{
 					"binding": "OAUTH_KV",
@@ -116,18 +100,6 @@
 			"name": "mcp-cloudflare-workers-observability-production",
 			"account_id": "6702657b6aa048cf3081ff3ff3c9c52f",
 			"routes": [{ "pattern": "observability.mcp.cloudflare.com", "custom_domain": true }],
-			"durable_objects": {
-				"bindings": [
-					{
-						"class_name": "ObservabilityMCP",
-						"name": "MCP_OBJECT"
-					},
-					{
-						"class_name": "UserDetails",
-						"name": "USER_DETAILS"
-					}
-				]
-			},
 			"kv_namespaces": [
 				{
 					"binding": "OAUTH_KV",
