@@ -1,5 +1,16 @@
 {
 	"configurations": [
+		
+		{
+			"name": "Attach to Edge",
+			"port": 9222,
+			"request": "attach",
+			"type": "msedge",
+			"webRoot": "${workspaceFolder}"
+		},
+		
+
+
 		{
 			"name": "Wrangler",
 			"type": "node",
